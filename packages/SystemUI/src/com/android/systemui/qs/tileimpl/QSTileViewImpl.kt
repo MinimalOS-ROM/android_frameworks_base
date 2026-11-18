@@ -140,7 +140,17 @@ open class QSTileViewImpl @JvmOverloads constructor(
         clipToPadding = false
         isFocusable = true
         background = createTileBackground()
-        isFocusable = true
+        setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                setColor(android.graphics.Color.WHITE)
+                setLabelColor(android.graphics.Color.BLACK)
+                setSecondaryLabelColor(android.graphics.Color.BLACK)
+            } else {
+                setColor(getBackgroundColorForState(lastState))
+                setLabelColor(getLabelColorForState(lastState))
+                setSecondaryLabelColor(getSecondaryLabelColorForState(lastState))
+            }
+        }
         setOnKeyListener { _, keyCode, event ->
             if (event.action == android.view.KeyEvent.ACTION_DOWN &&
                 keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
@@ -258,6 +268,11 @@ open class QSTileViewImpl @JvmOverloads constructor(
     fun createTileBackground(): Drawable {
         ripple = mContext.getDrawable(R.drawable.qs_tile_background) as RippleDrawable
         colorBackgroundDrawable = ripple.findDrawableByLayerId(R.id.background)
+        if (colorBackgroundDrawable is android.graphics.drawable.GradientDrawable) {
+            val gd = colorBackgroundDrawable as android.graphics.drawable.GradientDrawable
+            gd.cornerRadius = 0f
+            gd.setStroke(2, 0xFF333333.toInt())
+        }
         return ripple
     }
 

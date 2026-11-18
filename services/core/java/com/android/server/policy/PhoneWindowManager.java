@@ -3155,15 +3155,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         if (repeatCount == 0) {
                             mAppSwitchLongPressed = false;
                         } else if (longPress) {
-                            if (!keyguardOn && mAppSwitchLongPressAction != Action.NOTHING) {
-                                if (mAppSwitchLongPressAction != Action.APP_SWITCH) {
-                                    cancelPreloadRecentApps();
-                                }
+                            if (!keyguardOn) {
+                                cancelPreloadRecentApps();
                                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS, false,
                                         "Recents - Long Press");
-                                performKeyAction(mAppSwitchLongPressAction, event);
+                                IStatusBarService service = getStatusBarService();
+                                if (service != null) {
+                                    try {
+                                        service.expandSettingsPanel(null);
+                                    } catch (RemoteException e) {
+                                        // do nothing.
+                                    }
+                                }
                                 mAppSwitchLongPressed = true;
-                        }
+                            }
                         }
                     } else {
                         if (mAppSwitchLongPressed) {
