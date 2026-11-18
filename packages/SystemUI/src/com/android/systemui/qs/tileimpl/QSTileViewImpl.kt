@@ -92,7 +92,6 @@ open class QSTileViewImpl @JvmOverloads constructor(
 
     private val colorSecondaryLabelActive = 0xFF222222.toInt()
     private val colorSecondaryLabelInactive = 0xFFCCCCCC.toInt()
-            Utils.getColorAttrDefaultColor(context, android.R.attr.textColorSecondary)
     private val colorSecondaryLabelUnavailable =
             Utils.applyAlpha(UNAVAILABLE_ALPHA, colorSecondaryLabelInactive)
 
