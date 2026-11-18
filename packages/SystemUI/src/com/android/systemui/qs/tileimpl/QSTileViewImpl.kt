@@ -82,20 +82,16 @@ open class QSTileViewImpl @JvmOverloads constructor(
             updateHeight()
         }
 
-    private val colorActive = Utils.getColorAttrDefaultColor(context,
-            android.R.attr.colorAccent)
-    private val colorInactive = Utils.getColorAttrDefaultColor(context, R.attr.offStateColor)
-    private val colorUnavailable = Utils.applyAlpha(UNAVAILABLE_ALPHA, colorInactive)
+    private val colorActive = android.graphics.Color.WHITE
+    private val colorInactive = android.graphics.Color.BLACK
+    private val colorUnavailable = 0xFF1A1A1A.toInt()
 
-    private val colorLabelActive =
-            Utils.getColorAttrDefaultColor(context, android.R.attr.textColorPrimaryInverse)
-    private val colorLabelInactive =
-            Utils.getColorAttrDefaultColor(context, android.R.attr.textColorPrimary)
-    private val colorLabelUnavailable = Utils.applyAlpha(UNAVAILABLE_ALPHA, colorLabelInactive)
+    private val colorLabelActive = android.graphics.Color.BLACK
+    private val colorLabelInactive = android.graphics.Color.WHITE
+    private val colorLabelUnavailable = 0xFF666666.toInt()
 
-    private val colorSecondaryLabelActive =
-            Utils.getColorAttrDefaultColor(context, android.R.attr.textColorSecondaryInverse)
-    private val colorSecondaryLabelInactive =
+    private val colorSecondaryLabelActive = 0xFF222222.toInt()
+    private val colorSecondaryLabelInactive = 0xFFCCCCCC.toInt()
             Utils.getColorAttrDefaultColor(context, android.R.attr.textColorSecondary)
     private val colorSecondaryLabelUnavailable =
             Utils.applyAlpha(UNAVAILABLE_ALPHA, colorSecondaryLabelInactive)
@@ -156,6 +152,26 @@ open class QSTileViewImpl @JvmOverloads constructor(
 
         createAndAddLabels()
         createAndAddSideView()
+        updateDpadFocusBorder(false)
+    }
+
+    override fun onFocusChanged(
+        gainFocus: Boolean,
+        direction: Int,
+        previouslyFocusedRect: android.graphics.Rect?
+    ) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        updateDpadFocusBorder(gainFocus)
+    }
+
+    private fun updateDpadFocusBorder(focused: Boolean) {
+        val density = resources.displayMetrics.density
+        val strokePx = ((if (focused) 2f else 1f) * density).toInt().coerceAtLeast(1)
+        val border = android.graphics.drawable.GradientDrawable().apply {
+            setColor(android.graphics.Color.TRANSPARENT)
+            setStroke(strokePx, if (focused) android.graphics.Color.WHITE else 0xFF444444.toInt())
+        }
+        foreground = border
     }
 
     override fun onConfigurationChanged(newConfig: Configuration?) {
