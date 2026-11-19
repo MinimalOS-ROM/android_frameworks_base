@@ -2150,18 +2150,15 @@ public class VolumeDialogImpl implements VolumeDialog,
         if (!useActiveColoring && !mChangeVolumeRowTintWhenInactive) {
             return;
         }
-        final ColorStateList colorTint = useActiveColoring
-                ? Utils.getColorAccent(mContext)
-                : Utils.getColorAttr(mContext, com.android.internal.R.attr.colorAccentSecondary);
+        final ColorStateList colorTint = ColorStateList.valueOf(
+                useActiveColoring ? Color.WHITE : 0xFF666666);
         final int alpha = useActiveColoring
                 ? Color.alpha(colorTint.getDefaultColor())
                 : getAlphaAttr(android.R.attr.secondaryContentAlpha);
 
-        final ColorStateList bgTint = Utils.getColorAttr(
-                mContext, android.R.attr.colorBackgroundFloating);
+        final ColorStateList bgTint = ColorStateList.valueOf(Color.BLACK);
 
-        final ColorStateList inverseTextTint = Utils.getColorAttr(
-                mContext, com.android.internal.R.attr.textColorOnAccent);
+        final ColorStateList inverseTextTint = ColorStateList.valueOf(Color.BLACK);
 
         row.sliderProgressSolid.setTintList(colorTint);
         if (row.sliderBgIcon != null) {
