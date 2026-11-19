@@ -25,7 +25,11 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.TypedArray;
 import android.database.Cursor;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
@@ -628,6 +632,55 @@ public class AlertController {
         setBackground(a, topPanel, contentPanel, customPanel, buttonPanel,
                 hasTopPanel, hasCustomPanel, hasButtonPanel);
         a.recycle();
+
+        applyMinimalMonochromeTheme(parentPanel);
+    }
+
+    private void applyMinimalMonochromeTheme(View parentPanel) {
+        if (parentPanel == null) {
+            return;
+        }
+        int strokePx = Math.max(1,
+                Math.round(mContext.getResources().getDisplayMetrics().density));
+        mWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        GradientDrawable panelBg = new GradientDrawable();
+        panelBg.setCornerRadius(0f);
+        panelBg.setColor(Color.BLACK);
+        panelBg.setStroke(strokePx, Color.WHITE);
+        parentPanel.setBackground(panelBg);
+
+        if (mTitleView != null) {
+            mTitleView.setTextColor(Color.WHITE);
+            mTitleView.setTypeface(Typeface.create("monospace", Typeface.BOLD));
+        }
+        if (mMessageView != null) {
+            mMessageView.setTextColor(0xFFCCCCCC);
+            mMessageView.setTypeface(Typeface.create("monospace", Typeface.NORMAL));
+        }
+        styleMinimalButton(mButtonPositive, strokePx);
+        styleMinimalButton(mButtonNegative, strokePx);
+        styleMinimalButton(mButtonNeutral, strokePx);
+    }
+
+    private void styleMinimalButton(Button btn, int strokePx) {
+        if (btn == null || btn.getVisibility() == View.GONE) {
+            return;
+        }
+        btn.setTypeface(Typeface.create("monospace", Typeface.BOLD));
+        btn.setAllCaps(true);
+        applyMinimalButtonColors(btn, btn.isFocused(), strokePx);
+        btn.setOnFocusChangeListener((v, hasFocus) ->
+                applyMinimalButtonColors(btn, hasFocus, strokePx));
+    }
+
+    private void applyMinimalButtonColors(Button btn, boolean focused, int strokePx) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(0f);
+        bg.setColor(focused ? Color.WHITE : Color.BLACK);
+        bg.setStroke(strokePx, focused ? Color.WHITE : 0xFF666666);
+        btn.setBackground(bg);
+        btn.setTextColor(focused ? Color.BLACK : Color.WHITE);
     }
 
     private boolean requestFocusForContent(View content) {

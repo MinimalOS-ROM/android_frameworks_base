@@ -124,8 +124,7 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
         mCellMarginHorizontal = res.getDimensionPixelSize(R.dimen.qs_tile_margin_horizontal);
         mSidePadding = useSidePadding() ? mCellMarginHorizontal / 2 : 0;
         mCellMarginVertical= res.getDimensionPixelSize(R.dimen.qs_tile_margin_vertical);
-        mMaxAllowedRows = Math.max(1, getResources().getInteger(R.integer.quick_settings_max_rows));
-        if (mLessRows) mMaxAllowedRows = Math.max(mMinRows, mMaxAllowedRows - 1);
+        mMaxAllowedRows = 3;
         if (updateColumns()) {
             requestLayout();
             return true;
@@ -139,7 +138,7 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
 
     private boolean updateColumns() {
         int oldColumns = mColumns;
-        mColumns = 1;
+        mColumns = 3;
         return oldColumns != mColumns;
     }
 

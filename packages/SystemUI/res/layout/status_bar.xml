@@ -24,6 +24,7 @@
     android:layout_width="match_parent"
     android:layout_height="@dimen/status_bar_height"
     android:id="@+id/status_bar"
+    android:background="#000000"
     android:orientation="vertical"
     android:focusable="false"
     android:descendantFocusability="afterDescendants"
@@ -89,6 +90,7 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:alpha="0"
                     android:orientation="horizontal"
                     android:clipChildren="false"/>
 
@@ -164,5 +166,11 @@
         android:layout_height="match_parent"
         android:layout="@layout/emergency_cryptkeeper_text"
     />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_gravity="bottom"
+        android:background="#333333" />
 
 </com.android.systemui.statusbar.phone.PhoneStatusBarView>

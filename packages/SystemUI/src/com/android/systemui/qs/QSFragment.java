@@ -389,10 +389,7 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
                 : View.INVISIBLE);
         mHeader.setExpanded((keyguardShowing && !mHeaderAnimating && !mShowCollapsedOnKeyguard)
                 || (expanded && !mStackScrollerOverscrolling), mQuickQSPanelController);
-        mFooter.setVisibility(!mQsDisabled && (expanded || !keyguardShowing || mHeaderAnimating
-                || mShowCollapsedOnKeyguard)
-                ? View.VISIBLE
-                : View.INVISIBLE);
+        mFooter.setVisibility(View.GONE);
         mFooter.setExpanded((keyguardShowing && !mHeaderAnimating && !mShowCollapsedOnKeyguard)
                 || (expanded && !mStackScrollerOverscrolling));
         mQSPanelController.setVisibility(
@@ -446,6 +443,22 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
         mQsExpanded = expanded;
         mQSPanelController.setListening(mListening, mQsExpanded);
         updateQsState();
+        if (expanded && mQSPanelController.getTileLayout() instanceof ViewGroup) {
+            ViewGroup layout = (ViewGroup) mQSPanelController.getTileLayout();
+            layout.post(() -> {
+                View target = layout;
+                if (layout instanceof PagedTileLayout && layout.getChildCount() > 0
+                        && layout.getChildAt(0) instanceof ViewGroup) {
+                    ViewGroup firstPage = (ViewGroup) layout.getChildAt(0);
+                    if (firstPage.getChildCount() > 0) {
+                        target = firstPage.getChildAt(0);
+                    }
+                } else if (layout.getChildCount() > 0) {
+                    target = layout.getChildAt(0);
+                }
+                target.requestFocus();
+            });
+        }
     }
 
     private void setKeyguardShowing(boolean keyguardShowing) {

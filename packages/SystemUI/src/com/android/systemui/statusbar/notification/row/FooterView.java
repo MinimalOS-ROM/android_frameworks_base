@@ -19,6 +19,8 @@ package com.android.systemui.statusbar.notification.row;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
 import android.view.View;
 
@@ -66,6 +68,9 @@ public class FooterView extends StackScrollerDecorView {
         super.onFinishInflate();
         mDismissButton = (FooterViewButton) findSecondaryView();
         mManageButton = findViewById(R.id.manage_text);
+        mManageButton.setVisibility(View.GONE);
+        mDismissButton.setOnFocusChangeListener((v, hasFocus) -> updateDismissButtonStyle(hasFocus));
+        updateDismissButtonStyle(mDismissButton.isFocused());
     }
 
     public void setManageButtonClickListener(OnClickListener listener) {
@@ -114,12 +119,18 @@ public class FooterView extends StackScrollerDecorView {
      * Update the text and background colors for the current color palette and night mode setting.
      */
     public void updateColors() {
-        Resources.Theme theme = mContext.getTheme();
-        int textColor = getResources().getColor(R.color.notif_pill_text, theme);
-        mDismissButton.setBackground(theme.getDrawable(R.drawable.notif_footer_btn_background));
-        mDismissButton.setTextColor(textColor);
-        mManageButton.setBackground(theme.getDrawable(R.drawable.notif_footer_btn_background));
-        mManageButton.setTextColor(textColor);
+        mManageButton.setVisibility(View.GONE);
+        updateDismissButtonStyle(mDismissButton.isFocused());
+    }
+
+    private void updateDismissButtonStyle(boolean focused) {
+        int strokePx = Math.max(1, Math.round(getResources().getDisplayMetrics().density));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(0f);
+        bg.setColor(focused ? Color.WHITE : Color.BLACK);
+        bg.setStroke(strokePx, focused ? Color.WHITE : 0xFF888888);
+        mDismissButton.setBackground(bg);
+        mDismissButton.setTextColor(focused ? Color.BLACK : Color.WHITE);
     }
 
     @Override

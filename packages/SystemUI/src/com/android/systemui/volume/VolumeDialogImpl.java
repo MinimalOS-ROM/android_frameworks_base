@@ -61,8 +61,10 @@ import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.Region;
+import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RotateDrawable;
 import android.media.AudioManager;
@@ -83,8 +85,10 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
+import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.AccessibilityDelegate;
@@ -289,6 +293,21 @@ public class VolumeDialogImpl implements VolumeDialog,
     // Number of animating rows
     private int mAnimatingRows = 0;
 
+    private static final int[] MINIMAL_STREAMS = new int[] {
+            STREAM_MUSIC, STREAM_RING, STREAM_ALARM, STREAM_VOICE_CALL
+    };
+    private static final String[] MINIMAL_STREAM_LABELS = new String[] {
+            "MEDIA", "RING", "ALARM", "CALL"
+    };
+    private LinearLayout mMinimalVolumeContainer;
+    private final LinearLayout[] mMinimalCards = new LinearLayout[4];
+    private final TextView[] mMinimalLabels = new TextView[4];
+    private final TextView[] mMinimalPercents = new TextView[4];
+    private final LinearLayout[] mMinimalTracks = new LinearLayout[4];
+    private final View[] mMinimalFills = new View[4];
+    private final View[] mMinimalTrackSpacers = new View[4];
+    private int mMinimalSelectedIndex = 0;
+
     public VolumeDialogImpl(
             Context context,
             VolumeDialogController volumeDialogController,
@@ -459,9 +478,9 @@ public class VolumeDialogImpl implements VolumeDialog,
         mWindow.requestFeature(Window.FEATURE_NO_TITLE);
         mWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         mWindow.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND
-                | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR);
-        mWindow.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR
+                | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        mWindow.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                 | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                 | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
@@ -472,40 +491,24 @@ public class VolumeDialogImpl implements VolumeDialog,
         lp.format = PixelFormat.TRANSLUCENT;
         lp.setTitle(VolumeDialogImpl.class.getSimpleName());
         lp.windowAnimations = -1;
-        lp.gravity = mContext.getResources().getInteger(R.integer.volume_dialog_gravity);
-        if (!mShowActiveStreamOnly) {
-            lp.gravity &= ~(Gravity.LEFT | Gravity.RIGHT);
-            lp.gravity |= mVolumePanelOnLeft ? Gravity.LEFT : Gravity.RIGHT;
-        }
+        lp.gravity = Gravity.FILL;
         mWindow.setAttributes(lp);
-        mWindow.setLayout(WRAP_CONTENT, WRAP_CONTENT);
+        mWindow.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 
         mDialog.setContentView(R.layout.volume_dialog);
         mDialogView = mDialog.findViewById(R.id.volume_dialog);
         mDialogView.setAlpha(0);
-        mDialogView.setLayoutDirection(
-                mVolumePanelOnLeft ? LAYOUT_DIRECTION_LTR : LAYOUT_DIRECTION_RTL);
+        mDialogView.setLayoutDirection(LAYOUT_DIRECTION_LTR);
         mDialog.setCanceledOnTouchOutside(true);
         mDialog.setOnShowListener(dialog -> {
             mDialogView.getViewTreeObserver().addOnComputeInternalInsetsListener(this);
-            if (!shouldSlideInVolumeTray()) {
-                mDialogView.setTranslationX(
-                        getTranslationForPanelLocation() * mDialogView.getWidth() / 2.0f);
-            }
+            mDialogView.setTranslationX(0f);
             mDialogView.setAlpha(0);
             mDialogView.animate()
                     .alpha(1)
                     .translationX(0)
                     .setDuration(mDialogShowAnimationDurationMs)
                     .setInterpolator(new SystemUIInterpolators.LogDecelerateInterpolator())
-                    .withEndAction(() -> {
-                        if (!Prefs.getBoolean(mContext, Prefs.Key.TOUCHED_RINGER_TOGGLE, false)) {
-                            if (mRingerIcon != null) {
-                                mRingerIcon.postOnAnimationDelayed(
-                                        getSinglePressFor(mRingerIcon), 1500);
-                            }
-                        }
-                    })
                     .start();
         });
 
@@ -691,6 +694,169 @@ public class VolumeDialogImpl implements VolumeDialog,
         initRingerH();
         initSettingsH();
         initODICaptionsH();
+        setupMinimalVolumePanel();
+    }
+
+    private void setupMinimalVolumePanel() {
+        if (mTopContainer != null) mTopContainer.setVisibility(GONE);
+        if (mODICaptionsView != null) mODICaptionsView.setVisibility(GONE);
+        if (mRingerAndDrawerContainer != null) mRingerAndDrawerContainer.setVisibility(GONE);
+        if (mExpandRowsView != null) mExpandRowsView.setVisibility(GONE);
+        if (mSettingsView != null) mSettingsView.setVisibility(GONE);
+
+        ViewGroup container = mDialog.findViewById(R.id.volume_dialog_container);
+        if (container != null) {
+            ViewGroup.LayoutParams clp = container.getLayoutParams();
+            clp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            clp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            container.setLayoutParams(clp);
+        }
+
+        mDialogView.setPadding(0, 0, 0, 0);
+        mDialogView.setBackgroundColor(Color.BLACK);
+        ViewGroup.LayoutParams dlp = mDialogView.getLayoutParams();
+        dlp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+        dlp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+        mDialogView.setLayoutParams(dlp);
+        setGravity(mDialogView, Gravity.CENTER_VERTICAL);
+
+        float density = mContext.getResources().getDisplayMetrics().density;
+        int padH = Math.round(16 * density);
+        int cardPad = Math.round(14 * density);
+        int cardMarginBottom = Math.round(10 * density);
+        int trackHeight = Math.round(10 * density);
+        int trackMarginTop = Math.round(10 * density);
+
+        if (mMinimalVolumeContainer != null) {
+            mDialogView.removeView(mMinimalVolumeContainer);
+        }
+        mMinimalVolumeContainer = new LinearLayout(mContext);
+        mMinimalVolumeContainer.setOrientation(LinearLayout.VERTICAL);
+        mMinimalVolumeContainer.setGravity(Gravity.CENTER_VERTICAL);
+        mMinimalVolumeContainer.setBackgroundColor(Color.BLACK);
+        mMinimalVolumeContainer.setLayoutDirection(LAYOUT_DIRECTION_LTR);
+        mMinimalVolumeContainer.setPadding(padH, 0, padH, 0);
+        mDialogView.addView(mMinimalVolumeContainer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        Typeface monoBold = Typeface.create("monospace", Typeface.BOLD);
+        Typeface monoRegular = Typeface.create("monospace", Typeface.NORMAL);
+
+        for (int i = 0; i < MINIMAL_STREAMS.length; i++) {
+            final int index = i;
+            LinearLayout card = new LinearLayout(mContext);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(cardPad, cardPad, cardPad, cardPad);
+            card.setOnClickListener(v -> {
+                mMinimalSelectedIndex = index;
+                mController.setActiveStream(MINIMAL_STREAMS[index]);
+                updateMinimalVolumeCards();
+                rescheduleTimeoutH();
+            });
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (i < MINIMAL_STREAMS.length - 1) {
+                cardLp.bottomMargin = cardMarginBottom;
+            }
+            mMinimalVolumeContainer.addView(card, cardLp);
+
+            LinearLayout topRow = new LinearLayout(mContext);
+            topRow.setOrientation(LinearLayout.HORIZONTAL);
+            card.addView(topRow, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            TextView labelTv = new TextView(mContext);
+            labelTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+            labelTv.setTypeface(monoBold);
+            labelTv.setSingleLine(true);
+            topRow.addView(labelTv, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            TextView pctTv = new TextView(mContext);
+            pctTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+            pctTv.setTypeface(monoRegular);
+            pctTv.setSingleLine(true);
+            pctTv.setGravity(Gravity.END);
+            topRow.addView(pctTv, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            LinearLayout track = new LinearLayout(mContext);
+            track.setOrientation(LinearLayout.HORIZONTAL);
+            track.setWeightSum(100f);
+            int strokePx = Math.max(1, Math.round(density));
+            track.setPadding(strokePx, strokePx, strokePx, strokePx);
+            LinearLayout.LayoutParams trackLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, trackHeight);
+            trackLp.topMargin = trackMarginTop;
+            card.addView(track, trackLp);
+
+            View fill = new View(mContext);
+            track.addView(fill, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 0f));
+
+            View spacer = new View(mContext);
+            track.addView(spacer, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 100f));
+
+            mMinimalCards[i] = card;
+            mMinimalLabels[i] = labelTv;
+            mMinimalPercents[i] = pctTv;
+            mMinimalTracks[i] = track;
+            mMinimalFills[i] = fill;
+            mMinimalTrackSpacers[i] = spacer;
+        }
+        updateMinimalVolumeCards();
+    }
+
+    private void updateMinimalVolumeCards() {
+        if (mMinimalVolumeContainer == null) {
+            return;
+        }
+        int strokePx = Math.max(1, Math.round(mContext.getResources().getDisplayMetrics().density));
+        for (int i = 0; i < MINIMAL_STREAMS.length; i++) {
+            int stream = MINIMAL_STREAMS[i];
+            boolean selected = (i == mMinimalSelectedIndex);
+            StreamState ss = (mState != null && mState.states != null) ? mState.states.get(stream) : null;
+            int pct = 0;
+            if (ss != null && !ss.muted) {
+                int span = Math.max(1, ss.levelMax - ss.levelMin);
+                pct = Math.max(0, Math.min(100, Math.round(100f * (ss.level - ss.levelMin) / span)));
+            }
+
+            mMinimalLabels[i].setText(selected
+                    ? "> " + MINIMAL_STREAM_LABELS[i]
+                    : MINIMAL_STREAM_LABELS[i]);
+            mMinimalPercents[i].setText(pct + "%");
+
+            GradientDrawable cardBg = new GradientDrawable();
+            cardBg.setCornerRadius(0f);
+            cardBg.setColor(selected ? Color.WHITE : Color.BLACK);
+            cardBg.setStroke(strokePx, selected ? Color.WHITE : 0xFF666666);
+            mMinimalCards[i].setBackground(cardBg);
+
+            int textColor = selected ? Color.BLACK : Color.WHITE;
+            mMinimalLabels[i].setTextColor(textColor);
+            mMinimalPercents[i].setTextColor(textColor);
+
+            GradientDrawable trackBg = new GradientDrawable();
+            trackBg.setCornerRadius(0f);
+            trackBg.setColor(selected ? Color.WHITE : Color.BLACK);
+            trackBg.setStroke(strokePx, selected ? Color.BLACK : Color.WHITE);
+            mMinimalTracks[i].setBackground(trackBg);
+
+            mMinimalFills[i].setBackgroundColor(selected ? Color.BLACK : Color.WHITE);
+            mMinimalTrackSpacers[i].setBackgroundColor(Color.TRANSPARENT);
+
+            LinearLayout.LayoutParams fillLp =
+                    (LinearLayout.LayoutParams) mMinimalFills[i].getLayoutParams();
+            fillLp.weight = pct;
+            mMinimalFills[i].setLayoutParams(fillLp);
+
+            LinearLayout.LayoutParams spacerLp =
+                    (LinearLayout.LayoutParams) mMinimalTrackSpacers[i].getLayoutParams();
+            spacerLp.weight = 100f - pct;
+            mMinimalTrackSpacers[i].setLayoutParams(spacerLp);
+        }
     }
 
     private void initDimens() {
@@ -1515,6 +1681,14 @@ public class VolumeDialogImpl implements VolumeDialog,
         }
 
         initSettingsH();
+        mMinimalSelectedIndex = 0;
+        for (int i = 0; i < MINIMAL_STREAMS.length; i++) {
+            if (MINIMAL_STREAMS[i] == mActiveStream) {
+                mMinimalSelectedIndex = i;
+                break;
+            }
+        }
+        updateMinimalVolumeCards();
         mShowing = true;
         mIsAnimatingDismiss = false;
         mDialog.show();
@@ -1665,6 +1839,7 @@ public class VolumeDialogImpl implements VolumeDialog,
         if (!mShowing) {
             trimObsoleteH();
         }
+        updateMinimalVolumeCards();
 
         boolean isOutmostIndexMax = mVolumePanelOnLeft ? isRtl() : !isRtl();
 
@@ -1987,6 +2162,7 @@ public class VolumeDialogImpl implements VolumeDialog,
             updateVolumeRowH(row);
         }
         updateRingerH();
+        updateMinimalVolumeCards();
         mWindow.setTitle(composeWindowTitle());
     }
 
@@ -2538,6 +2714,79 @@ public class VolumeDialogImpl implements VolumeDialog,
         public boolean dispatchTouchEvent(MotionEvent ev) {
             rescheduleTimeoutH();
             return super.dispatchTouchEvent(ev);
+        }
+
+        @Override
+        public boolean dispatchKeyEvent(KeyEvent event) {
+            rescheduleTimeoutH();
+            int keyCode = event.getKeyCode();
+            boolean isHandledKey = keyCode == KeyEvent.KEYCODE_DPAD_UP
+                    || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                    || keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+                    || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                    || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                    || keyCode == KeyEvent.KEYCODE_BACK
+                    || keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+                    || keyCode == KeyEvent.KEYCODE_ENTER;
+            if (!isHandledKey) {
+                return super.dispatchKeyEvent(event);
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                return true;
+            }
+            if (event.getAction() != KeyEvent.ACTION_DOWN) {
+                return super.dispatchKeyEvent(event);
+            }
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    mMinimalSelectedIndex = (mMinimalSelectedIndex + 3) % 4;
+                    mController.setActiveStream(MINIMAL_STREAMS[mMinimalSelectedIndex]);
+                    updateMinimalVolumeCards();
+                    return true;
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    mMinimalSelectedIndex = (mMinimalSelectedIndex + 1) % 4;
+                    mController.setActiveStream(MINIMAL_STREAMS[mMinimalSelectedIndex]);
+                    updateMinimalVolumeCards();
+                    return true;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                case KeyEvent.KEYCODE_VOLUME_DOWN: {
+                    int stream = MINIMAL_STREAMS[mMinimalSelectedIndex];
+                    StreamState ss = (mState != null && mState.states != null)
+                            ? mState.states.get(stream) : null;
+                    if (ss != null) {
+                        int newLevel = Math.max(ss.levelMin, ss.level - 1);
+                        mController.setActiveStream(stream);
+                        mController.setStreamVolume(stream, newLevel);
+                        ss.level = newLevel;
+                        if (newLevel == 0) ss.muted = true;
+                        updateMinimalVolumeCards();
+                    }
+                    return true;
+                }
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                case KeyEvent.KEYCODE_VOLUME_UP: {
+                    int stream = MINIMAL_STREAMS[mMinimalSelectedIndex];
+                    StreamState ss = (mState != null && mState.states != null)
+                            ? mState.states.get(stream) : null;
+                    if (ss != null) {
+                        int newLevel = Math.min(ss.levelMax, ss.level + 1);
+                        mController.setActiveStream(stream);
+                        mController.setStreamVolume(stream, newLevel);
+                        ss.level = newLevel;
+                        ss.muted = false;
+                        updateMinimalVolumeCards();
+                    }
+                    return true;
+                }
+                case KeyEvent.KEYCODE_BACK:
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                    dismissH(Events.DISMISS_REASON_DONE_CLICKED);
+                    return true;
+                default:
+                    return super.dispatchKeyEvent(event);
+            }
         }
 
         @Override

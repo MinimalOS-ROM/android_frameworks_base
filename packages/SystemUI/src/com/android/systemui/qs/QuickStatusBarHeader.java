@@ -264,7 +264,8 @@ public class QuickStatusBarHeader extends FrameLayout implements TunerService.Tu
 
         boolean gone = shouldUseSplitShade || mUseCombinedQSHeader || mQsDisabled;
         mStatusIconsView.setVisibility(gone ? View.GONE : View.VISIBLE);
-        mDatePrivacyView.setVisibility(gone ? View.GONE : View.VISIBLE);
+        mDatePrivacyView.setVisibility(View.GONE);
+        mHeaderQsPanel.setVisibility(View.GONE);
 
         mConfigShowBatteryEstimate = resources.getBoolean(R.bool.config_showBatteryEstimateQSBH);
 
@@ -273,8 +274,7 @@ public class QuickStatusBarHeader extends FrameLayout implements TunerService.Tu
 
         int qsOffsetHeight = SystemBarUtils.getQuickQsOffsetHeight(mContext);
 
-        mDatePrivacyView.getLayoutParams().height =
-                Math.max(qsOffsetHeight, mDatePrivacyView.getMinimumHeight());
+        mDatePrivacyView.getLayoutParams().height = 0;
         mDatePrivacyView.setLayoutParams(mDatePrivacyView.getLayoutParams());
 
         mStatusIconsView.getLayoutParams().height =

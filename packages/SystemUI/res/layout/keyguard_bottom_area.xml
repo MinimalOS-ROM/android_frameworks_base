@@ -30,10 +30,20 @@
         android:layout_gravity="bottom|center_horizontal"
         android:orientation="vertical">
 
+        <TextView
+            android:id="@+id/minimal_locked_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="[ LOCKED ]"
+            android:textColor="#888888"
+            android:textSize="11sp" />
+
         <com.android.systemui.statusbar.phone.KeyguardIndicationTextView
             android:id="@+id/keyguard_indication_text"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:alpha="0"
             android:gravity="center"
             android:paddingStart="@dimen/keyguard_indication_text_padding"
             android:paddingEnd="@dimen/keyguard_indication_text_padding"
@@ -43,9 +53,9 @@
         <com.android.systemui.statusbar.phone.KeyguardIndicationTextView
             android:id="@+id/keyguard_indication_text_bottom"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
             android:gravity="center"
-            android:minHeight="48dp"
+            android:minHeight="0dp"
             android:layout_gravity="center_horizontal"
             android:layout_centerHorizontal="true"
             android:paddingStart="@dimen/keyguard_indication_text_padding"
@@ -53,7 +63,7 @@
             android:textAppearance="@style/TextAppearance.Keyguard.BottomArea"
             android:maxLines="2"
             android:ellipsize="end"
-            android:alpha=".8"
+            android:alpha="0"
             android:accessibilityLiveRegion="polite"
             android:visibility="gone"/>
 
@@ -64,6 +74,7 @@
         android:layout_height="@dimen/keyguard_affordance_height"
         android:layout_width="@dimen/keyguard_affordance_width"
         android:layout_gravity="bottom|end"
+        android:alpha="0"
         android:src="@drawable/ic_camera_alt_24dp"
         android:scaleType="center"
         android:contentDescription="@string/accessibility_camera_button"
@@ -74,6 +85,7 @@
         android:layout_height="@dimen/keyguard_affordance_height"
         android:layout_width="@dimen/keyguard_affordance_width"
         android:layout_gravity="bottom|start"
+        android:alpha="0"
         android:src="@*android:drawable/ic_phone"
         android:scaleType="center"
         android:contentDescription="@string/accessibility_phone_button"

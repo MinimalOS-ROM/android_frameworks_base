@@ -36,17 +36,22 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Path;
 import android.graphics.Point;
+import android.graphics.Rect;
+import android.graphics.Typeface;
 import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
+import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
@@ -54,6 +59,7 @@ import android.util.Log;
 import android.util.MathUtils;
 import android.util.Pair;
 import android.util.Property;
+import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -67,6 +73,8 @@ import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 import android.widget.Chronometer;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
@@ -224,6 +232,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private NotificationGuts mGuts;
     private NotificationEntry mEntry;
     private String mAppName;
+    private LinearLayout mMinimalCard;
+    private TextView mMinimalHeader;
+    private TextView mMinimalBody;
     private FalsingManager mFalsingManager;
     private FalsingCollector mFalsingCollector;
 
@@ -589,6 +600,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             mUpdateBackgroundOnUpdate = false;
             updateBackgroundColors();
         }
+        updateMinimalCardContent();
     }
 
     /** Called when the notification's ranking was changed (but nothing else changed). */
@@ -1574,6 +1586,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mImageResolver = new NotificationInlineImageResolver(userContextForEntry(mContext, entry),
                 new NotificationInlineImageCache());
         mAppName = appName;
+        updateMinimalCardContent();
         if (mMenuRow == null) {
             mMenuRow = new NotificationMenuRow(mContext, peopleNotificationIdentifier);
         }
@@ -1727,6 +1740,48 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             l.setExpandClickListener(mExpandClickListener);
             l.setContainingNotification(this);
         }
+        mPrivateLayout.setAlpha(0f);
+        mPublicLayout.setAlpha(0f);
+        if (mBackgroundNormal != null) {
+            mBackgroundNormal.setAlpha(0f);
+        }
+        View bgDimmed = findViewById(R.id.backgroundDimmed);
+        if (bgDimmed != null) {
+            bgDimmed.setAlpha(0f);
+        }
+
+        float density = getResources().getDisplayMetrics().density;
+        int padH = Math.round(14 * density);
+        int padV = Math.round(12 * density);
+        mMinimalCard = new LinearLayout(mContext);
+        mMinimalCard.setOrientation(LinearLayout.VERTICAL);
+        mMinimalCard.setPadding(padH, padV, padH, padV);
+
+        mMinimalHeader = new TextView(mContext);
+        mMinimalHeader.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+        mMinimalHeader.setTypeface(Typeface.create("monospace", Typeface.BOLD));
+        mMinimalHeader.setSingleLine(true);
+        mMinimalHeader.setEllipsize(TextUtils.TruncateAt.END);
+        mMinimalCard.addView(mMinimalHeader, new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        mMinimalBody = new TextView(mContext);
+        mMinimalBody.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+        mMinimalBody.setTypeface(Typeface.create("monospace", Typeface.NORMAL));
+        mMinimalBody.setMaxLines(2);
+        mMinimalBody.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        bodyLp.topMargin = Math.round(4 * density);
+        mMinimalCard.addView(mMinimalBody, bodyLp);
+
+        addView(mMinimalCard, new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        setFocusable(true);
+        setFocusableInTouchMode(false);
+        setClickable(true);
+        updateMinimalCardStyle(isFocused());
+
         mGutsStub = findViewById(R.id.notification_guts_stub);
         mGutsStub.setOnInflateListener((stub, inflated) -> {
             mGuts = (NotificationGuts) inflated;
@@ -2369,6 +2424,16 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     @Override
     public int getIntrinsicHeight() {
+        if (mMinimalCard != null) {
+            if (mMinimalCard.getMeasuredHeight() <= 0 && getWidth() > 0) {
+                mMinimalCard.measure(
+                        MeasureSpec.makeMeasureSpec(getWidth(), MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+            }
+            if (mMinimalCard.getMeasuredHeight() > 0) {
+                return mMinimalCard.getMeasuredHeight();
+            }
+        }
         if (isUserLocked()) {
             return getActualHeight();
         }
@@ -2531,9 +2596,60 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             mMenuRow.onParentHeightUpdate();
         }
         updateContentShiftHeight();
+        if (mMinimalCard != null) {
+            int widthSpec = MeasureSpec.makeMeasureSpec(getWidth(), MeasureSpec.EXACTLY);
+            int heightSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+            mMinimalCard.measure(widthSpec, heightSpec);
+            mMinimalCard.layout(0, 0, getWidth(), mMinimalCard.getMeasuredHeight());
+        }
         if (mLayoutListener != null) {
             mLayoutListener.onLayout();
         }
+    }
+
+    @Override
+    protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+        updateMinimalCardStyle(gainFocus);
+    }
+
+    private void updateMinimalCardContent() {
+        if (mMinimalCard == null) {
+            return;
+        }
+        Notification n = mEntry != null && mEntry.getSbn() != null
+                ? mEntry.getSbn().getNotification() : null;
+        CharSequence title = n != null && n.extras != null
+                ? n.extras.getCharSequence(Notification.EXTRA_TITLE) : null;
+        CharSequence text = n != null && n.extras != null
+                ? n.extras.getCharSequence(Notification.EXTRA_TEXT) : null;
+        if (TextUtils.isEmpty(text) && n != null && n.extras != null) {
+            text = n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
+        }
+        if (TextUtils.isEmpty(text) && n != null && n.extras != null) {
+            text = n.extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT);
+        }
+        String app = mAppName != null ? mAppName.toUpperCase() : "";
+        String headerText = !TextUtils.isEmpty(title)
+                ? (app.isEmpty() ? title.toString() : app + " \u2022 " + title)
+                : app;
+        mMinimalHeader.setText(headerText);
+        mMinimalBody.setText(text != null ? text : "");
+        mMinimalBody.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
+    }
+
+    private void updateMinimalCardStyle(boolean focused) {
+        if (mMinimalCard == null) {
+            return;
+        }
+        int strokePx = Math.max(1, Math.round(getResources().getDisplayMetrics().density));
+        GradientDrawable gd = new GradientDrawable();
+        gd.setCornerRadius(0f);
+        gd.setColor(focused ? Color.WHITE : Color.BLACK);
+        gd.setStroke(strokePx, focused ? Color.WHITE : 0xFF444444);
+        mMinimalCard.setBackground(gd);
+        mMinimalHeader.setTextColor(focused ? Color.BLACK : Color.WHITE);
+        mMinimalBody.setTextColor(focused ? 0xFF111111 : 0xFFCCCCCC);
     }
 
     /**

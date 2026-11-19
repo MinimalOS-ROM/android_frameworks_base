@@ -54,6 +54,7 @@ public class SectionHeaderView extends StackScrollerDecorView {
         bindContents();
         super.onFinishInflate();
         setVisible(true /* nowVisible */, false /* animate */);
+        setAlpha(0f);
     }
 
     private void bindContents() {

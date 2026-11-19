@@ -37,6 +37,11 @@ import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.widget.FrameLayout;
+import android.widget.TextView;
 import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
@@ -490,20 +495,29 @@ public class SplashscreenContentDrawer {
             Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "fillViewWithIcon");
             final ContextThemeWrapper wrapper = createViewContextWrapper(mContext);
             final SplashScreenView.Builder builder = new SplashScreenView.Builder(wrapper)
-                    .setBackgroundColor(mThemeColor)
-                    .setOverlayDrawable(mOverlayDrawable)
-                    .setIconSize(iconSize)
-                    .setIconBackground(background)
-                    .setCenterViewDrawable(foreground)
+                    .setBackgroundColor(Color.BLACK)
+                    .setOverlayDrawable(null)
+                    .setIconSize(0)
+                    .setIconBackground(null)
+                    .setCenterViewDrawable(null)
                     .setAnimationDurationMillis(animationDuration)
                     .setUiThreadInitConsumer(uiThreadInitTask);
 
-            if (mSuggestType == STARTING_WINDOW_TYPE_SPLASH_SCREEN
-                    && mTmpAttrs.mBrandingImage != null) {
-                builder.setBrandingDrawable(mTmpAttrs.mBrandingImage, mBrandingImageWidth,
-                        mBrandingImageHeight);
-            }
             final SplashScreenView splashScreenView = builder.build();
+            CharSequence rawLabel = mActivityInfo != null
+                    ? mActivityInfo.loadLabel(mContext.getPackageManager()) : null;
+            String appLabel = rawLabel != null ? rawLabel.toString().trim().toUpperCase() : "";
+            if (!appLabel.isEmpty()) {
+                TextView titleView = new TextView(wrapper);
+                titleView.setText("[ " + appLabel + " ]");
+                titleView.setTextColor(Color.WHITE);
+                titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+                titleView.setTypeface(Typeface.create("monospace", Typeface.BOLD));
+                titleView.setGravity(Gravity.CENTER);
+                splashScreenView.addView(titleView, new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT));
+            }
             if (DEBUG) {
                 Slog.d(TAG, "fillViewWithIcon surfaceWindowView " + splashScreenView);
             }

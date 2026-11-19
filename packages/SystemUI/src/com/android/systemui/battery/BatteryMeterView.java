@@ -24,14 +24,21 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 import android.animation.LayoutTransition;
 import android.animation.ObjectAnimator;
 import android.annotation.IntDef;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.UserHandle;
 import android.provider.Settings;
+import android.telephony.TelephonyManager;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -97,6 +104,13 @@ public class BatteryMeterView extends LinearLayout implements DarkReceiver {
     private int mNonAdaptedBackgroundColor;
 
     private BatteryEstimateFetcher mBatteryEstimateFetcher;
+    private boolean mNetworkReceiverRegistered;
+    private final BroadcastReceiver mNetworkReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            updatePercentText();
+        }
+    };
 
     public BatteryMeterView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
@@ -240,35 +254,37 @@ public class BatteryMeterView extends LinearLayout implements DarkReceiver {
         mBatteryEstimateFetcher = fetcher;
     }
 
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (!mNetworkReceiverRegistered) {
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+            filter.addAction(Intent.ACTION_SERVICE_STATE);
+            filter.addAction(Intent.ACTION_SIM_STATE_CHANGED);
+            mContext.registerReceiver(mNetworkReceiver, filter);
+            mNetworkReceiverRegistered = true;
+        }
+        updatePercentText();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (mNetworkReceiverRegistered) {
+            mContext.unregisterReceiver(mNetworkReceiver);
+            mNetworkReceiverRegistered = false;
+        }
+    }
+
     void updatePercentText() {
         if (mBatteryStateUnknown) {
             setContentDescription(getContext().getString(R.string.accessibility_battery_unknown));
             return;
         }
 
-        if (mBatteryEstimateFetcher == null) {
-            return;
-        }
-
         if (mBatteryPercentView != null) {
-            if (mShowPercentMode == MODE_ESTIMATE && !mCharging) {
-                mBatteryEstimateFetcher.fetchBatteryTimeRemainingEstimate(
-                        (String estimate) -> {
-                    if (mBatteryPercentView == null) {
-                        return;
-                    }
-                    if (estimate != null && mShowPercentMode == MODE_ESTIMATE) {
-                        mBatteryPercentView.setText(estimate);
-                        setContentDescription(getContext().getString(
-                                R.string.accessibility_battery_level_with_estimate,
-                                mLevel, estimate));
-                    } else {
-                        setPercentTextAtCurrentLevel();
-                    }
-                });
-            } else {
-                setPercentTextAtCurrentLevel();
-            }
+            setPercentTextAtCurrentLevel();
         } else {
             setContentDescription(
                     getContext().getString(mCharging ? R.string.accessibility_battery_level_charging
@@ -280,11 +296,98 @@ public class BatteryMeterView extends LinearLayout implements DarkReceiver {
         if (mBatteryPercentView == null) {
             return;
         }
-        mBatteryPercentView.setText(
-                NumberFormat.getPercentInstance().format(mLevel / 100f));
+        String ims = getImsLabel();
+        String net = getNetworkTypeLabel();
+        String pct = NumberFormat.getPercentInstance().format(mLevel / 100f);
+        StringBuilder sb = new StringBuilder();
+        if (!ims.isEmpty()) {
+            sb.append(ims).append(" ");
+        }
+        if (!net.isEmpty()) {
+            sb.append(net).append(" ");
+        }
+        sb.append(pct);
+        mBatteryPercentView.setText(sb.toString());
         setContentDescription(
                 getContext().getString(mCharging ? R.string.accessibility_battery_level_charging
                         : R.string.accessibility_battery_level, mLevel));
+    }
+
+    private String getImsLabel() {
+        try {
+            TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
+            if (tm == null) {
+                return "";
+            }
+            if (tm.isWifiCallingAvailable()) {
+                return "VoWiFi";
+            }
+            if (tm.isVolteAvailable()) {
+                return "VoLTE";
+            }
+            return "";
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private String getNetworkTypeLabel() {
+        try {
+            ConnectivityManager cm = mContext.getSystemService(ConnectivityManager.class);
+            if (cm != null) {
+                Network network = cm.getActiveNetwork();
+                NetworkCapabilities caps = network != null ? cm.getNetworkCapabilities(network) : null;
+                if (caps != null) {
+                    if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                        return "WIFI";
+                    }
+                    if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                        return getCellularLabel();
+                    }
+                }
+            }
+            return getCellularLabel();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private String getCellularLabel() {
+        TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
+        if (tm == null) {
+            return "";
+        }
+        int type = tm.getDataNetworkType();
+        if (type == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
+            type = tm.getVoiceNetworkType();
+        }
+        switch (type) {
+            case TelephonyManager.NETWORK_TYPE_NR:
+                return "5G";
+            case TelephonyManager.NETWORK_TYPE_LTE:
+            case TelephonyManager.NETWORK_TYPE_LTE_CA:
+            case TelephonyManager.NETWORK_TYPE_IWLAN:
+                return "LTE";
+            case TelephonyManager.NETWORK_TYPE_UMTS:
+            case TelephonyManager.NETWORK_TYPE_EVDO_0:
+            case TelephonyManager.NETWORK_TYPE_EVDO_A:
+            case TelephonyManager.NETWORK_TYPE_HSDPA:
+            case TelephonyManager.NETWORK_TYPE_HSUPA:
+            case TelephonyManager.NETWORK_TYPE_HSPA:
+            case TelephonyManager.NETWORK_TYPE_EVDO_B:
+            case TelephonyManager.NETWORK_TYPE_EHRPD:
+            case TelephonyManager.NETWORK_TYPE_HSPAP:
+            case TelephonyManager.NETWORK_TYPE_TD_SCDMA:
+                return "3G";
+            case TelephonyManager.NETWORK_TYPE_GPRS:
+            case TelephonyManager.NETWORK_TYPE_EDGE:
+            case TelephonyManager.NETWORK_TYPE_CDMA:
+            case TelephonyManager.NETWORK_TYPE_1xRTT:
+            case TelephonyManager.NETWORK_TYPE_IDEN:
+                return "2G";
+            default:
+                return "";
+        }
     }
 
     void updateShowPercent() {
@@ -401,9 +504,7 @@ public class BatteryMeterView extends LinearLayout implements DarkReceiver {
     }
 
     private int getBatteryStyle() {
-        return LineageSettings.System.getIntForUser(getContext().getContentResolver(),
-                LineageSettings.System.STATUS_BAR_BATTERY_STYLE, BATTERY_STYLE_PORTRAIT,
-                UserHandle.USER_CURRENT);
+        return BATTERY_STYLE_TEXT;
     }
 
     @Override

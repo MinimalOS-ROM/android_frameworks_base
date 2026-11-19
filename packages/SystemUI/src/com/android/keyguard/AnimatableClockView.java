@@ -95,6 +95,7 @@ public class AnimatableClockView extends TextView {
         } finally {
             ta.recycle();
         }
+        mIsSingleLine = true;
 
         refreshFormat();
     }

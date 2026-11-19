@@ -19,12 +19,13 @@
     android:id="@+id/system_icons"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center_vertical">
+    android:gravity="center_vertical|end">
 
     <com.android.systemui.statusbar.phone.StatusIconContainer android:id="@+id/statusIcons"
         android:layout_width="0dp"
-        android:layout_weight="1"
+        android:layout_weight="0"
         android:layout_height="match_parent"
+        android:alpha="0"
         android:paddingEnd="@dimen/signal_cluster_battery_padding"
         android:gravity="center_vertical"
         android:orientation="horizontal"/>

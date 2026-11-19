@@ -82,16 +82,16 @@ open class QSTileViewImpl @JvmOverloads constructor(
             updateHeight()
         }
 
-    private val colorActive = android.graphics.Color.WHITE
+    private val colorActive = android.graphics.Color.BLACK
     private val colorInactive = android.graphics.Color.BLACK
-    private val colorUnavailable = 0xFF1A1A1A.toInt()
+    private val colorUnavailable = android.graphics.Color.BLACK
 
-    private val colorLabelActive = android.graphics.Color.BLACK
+    private val colorLabelActive = android.graphics.Color.WHITE
     private val colorLabelInactive = android.graphics.Color.WHITE
     private val colorLabelUnavailable = 0xFF666666.toInt()
 
-    private val colorSecondaryLabelActive = 0xFF222222.toInt()
-    private val colorSecondaryLabelInactive = 0xFFCCCCCC.toInt()
+    private val colorSecondaryLabelActive = 0xFFAAAAAA.toInt()
+    private val colorSecondaryLabelInactive = 0xFF888888.toInt()
     private val colorSecondaryLabelUnavailable =
             Utils.applyAlpha(UNAVAILABLE_ALPHA, colorSecondaryLabelInactive)
 
@@ -101,6 +101,7 @@ open class QSTileViewImpl @JvmOverloads constructor(
     protected lateinit var sideView: ViewGroup
     private lateinit var customDrawableView: ImageView
     private lateinit var chevronView: ImageView
+    private lateinit var stateBadgeView: TextView
 
     protected var showRippleEffect = true
 
@@ -133,32 +134,16 @@ open class QSTileViewImpl @JvmOverloads constructor(
 
     init {
         setId(generateViewId())
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL or Gravity.START
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         clipChildren = false
         clipToPadding = false
         isFocusable = true
+        isFocusableInTouchMode = false
         background = createTileBackground()
         setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                setColor(android.graphics.Color.WHITE)
-                setLabelColor(android.graphics.Color.BLACK)
-                setSecondaryLabelColor(android.graphics.Color.BLACK)
-            } else {
-                setColor(getBackgroundColorForState(lastState))
-                setLabelColor(getLabelColorForState(lastState))
-                setSecondaryLabelColor(getSecondaryLabelColorForState(lastState))
-            }
-        }
-        setOnKeyListener { _, keyCode, event ->
-            if (event.action == android.view.KeyEvent.ACTION_DOWN &&
-                keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
-                performLongClick()
-                true
-            } else {
-                false
-            }
+            applyFocusAndStateColors(hasFocus, lastState)
         }
         setColor(getBackgroundColorForState(QSTile.State.DEFAULT_STATE))
 
@@ -168,10 +153,11 @@ open class QSTileViewImpl @JvmOverloads constructor(
 
         val iconSize = resources.getDimensionPixelSize(R.dimen.qs_icon_size)
         addView(_icon, LayoutParams(iconSize, iconSize))
+        _icon.visibility = View.GONE
 
         createAndAddLabels()
         createAndAddSideView()
-        updateDpadFocusBorder(false)
+        applyFocusAndStateColors(false, QSTile.State.DEFAULT_STATE)
     }
 
     override fun onFocusChanged(
@@ -180,7 +166,31 @@ open class QSTileViewImpl @JvmOverloads constructor(
         previouslyFocusedRect: android.graphics.Rect?
     ) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
-        updateDpadFocusBorder(gainFocus)
+        applyFocusAndStateColors(gainFocus, lastState)
+    }
+
+    private fun applyFocusAndStateColors(focused: Boolean, stateInt: Int) {
+        singleAnimator.cancel()
+        val resolvedState = if (stateInt == INVALID) QSTile.State.DEFAULT_STATE else stateInt
+        if (focused) {
+            setColor(android.graphics.Color.WHITE)
+            setLabelColor(android.graphics.Color.BLACK)
+            setSecondaryLabelColor(0xFF222222.toInt())
+            if (::stateBadgeView.isInitialized) {
+                stateBadgeView.setTextColor(android.graphics.Color.BLACK)
+            }
+        } else {
+            setColor(android.graphics.Color.BLACK)
+            setLabelColor(getLabelColorForState(resolvedState))
+            setSecondaryLabelColor(getSecondaryLabelColorForState(resolvedState))
+            if (::stateBadgeView.isInitialized) {
+                stateBadgeView.setTextColor(
+                    if (resolvedState == Tile.STATE_ACTIVE) android.graphics.Color.WHITE
+                    else 0xFF888888.toInt()
+                )
+            }
+        }
+        updateDpadFocusBorder(focused)
     }
 
     private fun updateDpadFocusBorder(focused: Boolean) {
@@ -188,7 +198,7 @@ open class QSTileViewImpl @JvmOverloads constructor(
         val strokePx = ((if (focused) 2f else 1f) * density).toInt().coerceAtLeast(1)
         val border = android.graphics.drawable.GradientDrawable().apply {
             setColor(android.graphics.Color.TRANSPARENT)
-            setStroke(strokePx, if (focused) android.graphics.Color.WHITE else 0xFF444444.toInt())
+            setStroke(strokePx, if (focused) android.graphics.Color.WHITE else 0xFF333333.toInt())
         }
         foreground = border
     }
@@ -219,7 +229,7 @@ open class QSTileViewImpl @JvmOverloads constructor(
 
         val labelMargin = resources.getDimensionPixelSize(R.dimen.qs_label_container_margin)
         (labelContainer.layoutParams as MarginLayoutParams).apply {
-            marginStart = labelMargin
+            marginStart = 0
         }
 
         (sideView.layoutParams as MarginLayoutParams).apply {
@@ -240,8 +250,16 @@ open class QSTileViewImpl @JvmOverloads constructor(
     private fun createAndAddLabels() {
         labelContainer = LayoutInflater.from(context)
                 .inflate(R.layout.qs_tile_label, this, false) as IgnorableChildLinearLayout
+        (labelContainer.layoutParams as LayoutParams).apply {
+            width = LayoutParams.MATCH_PARENT
+            height = LayoutParams.WRAP_CONTENT
+            weight = 0f
+            marginStart = 0
+        }
         label = labelContainer.requireViewById(R.id.tile_label)
+        label.gravity = Gravity.CENTER
         secondaryLabel = labelContainer.requireViewById(R.id.app_label)
+        secondaryLabel.gravity = Gravity.CENTER
         if (collapsed) {
             labelContainer.ignoreLastView = true
             // Ideally, it'd be great if the parent could set this up when measuring just this child
@@ -261,6 +279,13 @@ open class QSTileViewImpl @JvmOverloads constructor(
                 .inflate(R.layout.qs_tile_side_icon, this, false) as ViewGroup
         customDrawableView = sideView.requireViewById(R.id.customDrawable)
         chevronView = sideView.requireViewById(R.id.chevron)
+        stateBadgeView = TextView(context).apply {
+            textSize = 11f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setSingleLine(true)
+            gravity = Gravity.CENTER
+        }
+        sideView.addView(stateBadgeView)
         setChevronColor(getChevronColorForState(QSTile.State.DEFAULT_STATE))
         addView(sideView)
     }
@@ -490,8 +515,9 @@ open class QSTileViewImpl @JvmOverloads constructor(
         //
 
         // Labels
-        if (!Objects.equals(label.text, state.label)) {
-            label.text = state.label
+        val upperLabel = state.label?.toString()?.toUpperCase(java.util.Locale.getDefault())
+        if (!Objects.equals(label.text, upperLabel)) {
+            label.text = upperLabel
         }
         if (!Objects.equals(secondaryLabel.text, state.secondaryLabel)) {
             secondaryLabel.text = state.secondaryLabel
@@ -502,45 +528,11 @@ open class QSTileViewImpl @JvmOverloads constructor(
             }
         }
 
-        // Colors
-        if (state.state != lastState) {
-            singleAnimator.cancel()
-            if (allowAnimations) {
-                singleAnimator.setValues(
-                        colorValuesHolder(
-                                BACKGROUND_NAME,
-                                paintColor,
-                                getBackgroundColorForState(state.state)
-                        ),
-                        colorValuesHolder(
-                                LABEL_NAME,
-                                label.currentTextColor,
-                                getLabelColorForState(state.state)
-                        ),
-                        colorValuesHolder(
-                                SECONDARY_LABEL_NAME,
-                                secondaryLabel.currentTextColor,
-                                getSecondaryLabelColorForState(state.state)
-                        ),
-                        colorValuesHolder(
-                                CHEVRON_NAME,
-                                chevronView.imageTintList?.defaultColor ?: 0,
-                                getChevronColorForState(state.state)
-                        )
-                    )
-                singleAnimator.start()
-            } else {
-                setAllColors(
-                    getBackgroundColorForState(state.state),
-                    getLabelColorForState(state.state),
-                    getSecondaryLabelColorForState(state.state),
-                    getChevronColorForState(state.state)
-                )
-            }
-        }
-
-        // Right side icon
+        // Right side icon / badge
         loadSideViewDrawableIfNecessary(state)
+
+        // Colors
+        applyFocusAndStateColors(isFocused, state.state)
 
         label.isEnabled = !state.disabledByPolicy
 
@@ -577,18 +569,14 @@ open class QSTileViewImpl @JvmOverloads constructor(
     }
 
     private fun loadSideViewDrawableIfNecessary(state: QSTile.State) {
-        if (state.sideViewCustomDrawable != null) {
-            customDrawableView.setImageDrawable(state.sideViewCustomDrawable)
-            customDrawableView.visibility = VISIBLE
-            chevronView.visibility = GONE
-        } else if (state !is BooleanState || state.forceExpandIcon) {
-            customDrawableView.setImageDrawable(null)
-            customDrawableView.visibility = GONE
-            chevronView.visibility = VISIBLE
-        } else {
-            customDrawableView.setImageDrawable(null)
-            customDrawableView.visibility = GONE
-            chevronView.visibility = GONE
+        customDrawableView.setImageDrawable(null)
+        customDrawableView.visibility = GONE
+        chevronView.visibility = GONE
+        stateBadgeView.visibility = VISIBLE
+        stateBadgeView.text = when (state.state) {
+            Tile.STATE_ACTIVE -> "[ON]"
+            Tile.STATE_INACTIVE -> "[OFF]"
+            else -> "[--]"
         }
     }
 

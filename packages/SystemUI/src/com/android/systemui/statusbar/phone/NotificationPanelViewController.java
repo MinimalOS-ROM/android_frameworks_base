@@ -89,6 +89,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintSet;
@@ -854,6 +855,22 @@ public class NotificationPanelViewController extends PanelViewController {
         }
 
         mView.setOnApplyWindowInsetsListener(new OnApplyWindowInsetsListener());
+        mView.setFocusable(true);
+        mView.setFocusableInTouchMode(true);
+        mView.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                    && mBarState == KEYGUARD
+                    && !mStatusBarKeyguardViewManager.isBouncerShowing()) {
+                if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER
+                        || keyCode == android.view.KeyEvent.KEYCODE_ENTER
+                        || keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) {
+                    mStatusBar.executeRunnableDismissingKeyguard(
+                            null, null, false, true, false);
+                    return true;
+                }
+            }
+            return false;
+        });
 
         if (DEBUG) {
             mView.getOverlay().add(new DebugDrawable());
@@ -1393,6 +1410,14 @@ public class NotificationPanelViewController extends PanelViewController {
         }
         updateNotificationTranslucency();
         updateClock();
+
+        TextView notifCountBox = mView.findViewById(R.id.keyguard_notif_count_box);
+        if (notifCountBox != null) {
+            int count = mNotificationStackScrollLayoutController.getVisibleNotificationCount();
+            notifCountBox.setText(count + (count == 1 ? " NOTIFICATION" : " NOTIFICATIONS"));
+        }
+        mNotificationStackScrollLayoutController.getView().setAlpha(
+                mBarState == KEYGUARD ? 0f : 1f);
     }
 
     private void updateKeyguardStatusViewAlignment(boolean animate) {
@@ -2324,6 +2349,9 @@ public class NotificationPanelViewController extends PanelViewController {
         }
 
         mDepthController.setQsPanelExpansion(qsExpansionFraction);
+        mNotificationStackScrollLayoutController.getView().setVisibility(
+                mBarState == KEYGUARD || qsExpansionFraction > 0.1f
+                        ? View.INVISIBLE : View.VISIBLE);
     }
 
     private void onStackYChanged(boolean shouldAnimate) {
@@ -4485,6 +4513,11 @@ public class NotificationPanelViewController extends PanelViewController {
 
             mBarState = statusBarState;
             mKeyguardShowing = keyguardShowing;
+            mNotificationStackScrollLayoutController.getView().setAlpha(
+                    mBarState == KEYGUARD ? 0f : 1f);
+            mNotificationStackScrollLayoutController.getView().setVisibility(
+                    mBarState == KEYGUARD || computeQsExpansionFraction() > 0.1f
+                            ? View.INVISIBLE : View.VISIBLE);
 
             if (oldState == KEYGUARD && (goingToFullShade
                     || statusBarState == StatusBarState.SHADE_LOCKED)) {

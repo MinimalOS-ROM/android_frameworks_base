@@ -172,6 +172,7 @@ public class QSPanel extends LinearLayout implements Tunable {
         }
         addView(view, 0);
         mBrightnessView = view;
+        mBrightnessView.setVisibility(View.GONE);
         mAutoBrightnessView = view.findViewById(R.id.brightness_icon);
 
         setBrightnessViewMargin();
@@ -302,6 +303,10 @@ public class QSPanel extends LinearLayout implements Tunable {
     }
 
     private void updateViewVisibilityForTuningValue(View view, @Nullable String newValue) {
+        if (view == mBrightnessView) {
+            view.setVisibility(GONE);
+            return;
+        }
         view.setVisibility(TunerService.parseIntegerSwitch(newValue, true) ? VISIBLE : GONE);
     }
 

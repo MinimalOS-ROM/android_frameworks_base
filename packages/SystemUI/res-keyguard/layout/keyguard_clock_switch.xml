@@ -26,18 +26,19 @@
     android:layout_gravity="center_horizontal|top">
     <FrameLayout
         android:id="@+id/lockscreen_clock_view"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
-        android:paddingStart="@dimen/clock_padding_start">
+        android:paddingStart="0dp"
+        android:paddingTop="36dp">
         <com.android.keyguard.AnimatableClockView
             android:id="@+id/animatable_clock_view"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="start"
-            android:gravity="start"
-            android:textSize="@dimen/clock_text_size"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center"
+            android:textSize="48sp"
             android:fontFamily="@font/clock"
             android:elegantTextHeight="false"
             android:singleLine="true"
@@ -75,6 +76,7 @@
     <LinearLayout
         android:id="@+id/keyguard_status_area"
         android:orientation="vertical"
+        android:gravity="center_horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"
@@ -85,10 +87,24 @@
                android:layout_width="match_parent"
                android:layout_height="wrap_content" />
 
+      <TextView
+          android:id="@+id/keyguard_notif_count_box"
+          android:layout_width="match_parent"
+          android:layout_height="44dp"
+          android:layout_marginStart="24dp"
+          android:layout_marginEnd="24dp"
+          android:layout_marginTop="48dp"
+          android:gravity="center"
+          android:textColor="#FFFFFF"
+          android:textSize="12sp"
+          android:textStyle="bold"
+          android:text="0 NOTIFICATIONS" />
+
       <com.android.systemui.statusbar.phone.NotificationIconContainer
           android:id="@+id/left_aligned_notification_icon_container"
           android:layout_width="match_parent"
-          android:layout_height="@dimen/notification_shelf_height"
+          android:layout_height="0dp"
+          android:alpha="0"
           android:paddingStart="@dimen/below_clock_padding_start_icons"
           android:visibility="invisible"
           />

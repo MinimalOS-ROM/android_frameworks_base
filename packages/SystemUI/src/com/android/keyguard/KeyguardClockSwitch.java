@@ -8,15 +8,18 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
@@ -113,10 +116,8 @@ public class KeyguardClockSwitch extends RelativeLayout {
      * Apply dp changes on font/scale change
      */
     public void onDensityOrFontScaleChanged() {
-        mLargeClockView.setTextSize(TypedValue.COMPLEX_UNIT_PX, mContext.getResources()
-                .getDimensionPixelSize(R.dimen.large_clock_text_size));
-        mClockView.setTextSize(TypedValue.COMPLEX_UNIT_PX, mContext.getResources()
-                .getDimensionPixelSize(R.dimen.clock_text_size));
+        mLargeClockView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 48f);
+        mClockView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 48f);
 
         mClockSwitchYAmount = mContext.getResources().getDimensionPixelSize(
                 R.dimen.keyguard_clock_switch_y_shift);
@@ -126,10 +127,7 @@ public class KeyguardClockSwitch extends RelativeLayout {
     }
 
     public void onThemeChanged() {
-        String font = mContext.getString(com.android.internal.R.string.config_headlineFontFamily);
-        Typeface tf = font.equals("google-sans")
-                ? mContext.getResources().getFont(R.font.clock)
-                : Typeface.create(font, Typeface.NORMAL);
+        Typeface tf = Typeface.create("monospace", Typeface.BOLD);
         mClockView.setTypeface(tf);
         mLargeClockView.setTypeface(tf);
     }
@@ -150,6 +148,16 @@ public class KeyguardClockSwitch extends RelativeLayout {
         mLargeClockFrame = findViewById(R.id.lockscreen_clock_view_large);
         mLargeClockView = findViewById(R.id.animatable_clock_view_large);
         mStatusArea = findViewById(R.id.keyguard_status_area);
+
+        TextView notifBox = findViewById(R.id.keyguard_notif_count_box);
+        if (notifBox != null) {
+            int strokePx = Math.max(1, Math.round(getResources().getDisplayMetrics().density));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(Color.BLACK);
+            bg.setStroke(strokePx, 0xFF444444);
+            bg.setCornerRadius(0f);
+            notifBox.setBackground(bg);
+        }
 
         onDensityOrFontScaleChanged();
         onThemeChanged();
@@ -300,6 +308,7 @@ public class KeyguardClockSwitch extends RelativeLayout {
      * @return true if desired clock appeared and false if it was already visible
      */
     boolean switchToClock(@ClockSize int clockSize) {
+        clockSize = SMALL;
         if (mDisplayedClockSize != null && clockSize == mDisplayedClockSize) {
             return false;
         }

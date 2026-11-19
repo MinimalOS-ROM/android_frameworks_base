@@ -76,13 +76,13 @@ public enum ScrimState {
             }
             mFrontTint = Color.BLACK;
             mBehindTint = Color.BLACK;
-            mNotifTint = mClipQsScrim ? Color.BLACK : Color.TRANSPARENT;
+            mNotifTint = Color.BLACK;
 
             mFrontAlpha = 0;
-            mBehindAlpha = mClipQsScrim ? 1 : mScrimBehindAlphaKeyguard;
-            mNotifAlpha = mClipQsScrim ? mScrimBehindAlphaKeyguard : 0;
+            mBehindAlpha = 1f;
+            mNotifAlpha = 1f;
             if (mClipQsScrim) {
-                updateScrimColor(mScrimBehind, 1f /* alpha */, Color.TRANSPARENT);
+                updateScrimColor(mScrimBehind, 1f /* alpha */, Color.BLACK);
             }
         }
     },
@@ -140,20 +140,21 @@ public enum ScrimState {
     SHADE_LOCKED {
         @Override
         public void prepare(ScrimState previousState) {
-            mBehindAlpha = mClipQsScrim ? 1 : mDefaultScrimAlpha;
+            mBehindAlpha = 1f;
             mNotifAlpha = 1f;
             mFrontAlpha = 0f;
-            mBehindTint = Color.TRANSPARENT;
+            mBehindTint = Color.BLACK;
+            mNotifTint = Color.BLACK;
 
             if (mClipQsScrim) {
-                updateScrimColor(mScrimBehind, 1f /* alpha */, Color.TRANSPARENT);
+                updateScrimColor(mScrimBehind, 1f /* alpha */, Color.BLACK);
             }
         }
 
         // to make sure correct color is returned before "prepare" is called
         @Override
         public int getBehindTint() {
-            return Color.TRANSPARENT;
+            return Color.BLACK;
         }
     },
 

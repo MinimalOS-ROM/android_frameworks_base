@@ -33,6 +33,7 @@ import android.os.Trace;
 import android.text.TextUtils;
 import android.text.TextUtils.TruncateAt;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.animation.Animation;
@@ -145,7 +146,9 @@ public class KeyguardSliceView extends LinearLayout {
 
             SliceItem mainTitle = header.getTitleItem();
             CharSequence title = mainTitle != null ? mainTitle.getText() : null;
-            mTitle.setText(title);
+            mTitle.setText(title != null ? title.toString().toUpperCase() : null);
+            mTitle.setTextColor(0xFFAAAAAA);
+            mTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
             if (header.getPrimaryAction() != null
                     && header.getPrimaryAction().getAction() != null) {
                 clickActions.put(mTitle, header.getPrimaryAction().getAction());
@@ -157,8 +160,9 @@ public class KeyguardSliceView extends LinearLayout {
         final int startIndex = mHasHeader ? 1 : 0; // First item is header; skip it
         mRow.setVisibility(subItemsCount > 0 ? VISIBLE : GONE);
         LinearLayout.LayoutParams layoutParams = (LayoutParams) mRow.getLayoutParams();
-        layoutParams.gravity = Gravity.START;
+        layoutParams.gravity = Gravity.CENTER_HORIZONTAL;
         mRow.setLayoutParams(layoutParams);
+        mRow.setGravity(Gravity.CENTER);
 
         for (int i = startIndex; i < subItemsCount; i++) {
             RowContent rc = (RowContent) subItems.get(i);
@@ -181,27 +185,12 @@ public class KeyguardSliceView extends LinearLayout {
             clickActions.put(button, pendingIntent);
 
             final SliceItem titleItem = rc.getTitleItem();
-            button.setText(titleItem == null ? null : titleItem.getText());
+            CharSequence itemText = titleItem == null ? null : titleItem.getText();
+            button.setText(itemText != null ? itemText.toString().toUpperCase() : null);
+            button.setTextColor(0xFFAAAAAA);
+            button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
             button.setContentDescription(rc.getContentDescription());
-
-            Drawable iconDrawable = null;
-            SliceItem icon = SliceQuery.find(item.getSlice(),
-                    android.app.slice.SliceItem.FORMAT_IMAGE);
-            if (icon != null) {
-                final int iconSize = mHasHeader ? mIconSizeWithHeader : mIconSize;
-                iconDrawable = icon.getIcon().loadDrawable(mContext);
-                if (iconDrawable != null) {
-                    if (iconDrawable instanceof InsetDrawable) {
-                        // System icons (DnD) use insets which are fine for centered slice content
-                        // but will cause a slight indent for left/right-aligned slice views
-                        iconDrawable = ((InsetDrawable) iconDrawable).getDrawable();
-                    }
-                    final int width = (int) (iconDrawable.getIntrinsicWidth()
-                            / (float) iconDrawable.getIntrinsicHeight() * iconSize);
-                    iconDrawable.setBounds(0, 0, Math.max(width, 1), iconSize);
-                }
-            }
-            button.setCompoundDrawablesRelative(iconDrawable, null, null, null);
+            button.setCompoundDrawablesRelative(null, null, null, null);
             button.setOnClickListener(mOnClickListener);
             button.setClickable(pendingIntent != null);
         }
@@ -251,7 +240,7 @@ public class KeyguardSliceView extends LinearLayout {
 
     @VisibleForTesting
     int getTextColor() {
-        return ColorUtils.blendARGB(mTextColor, Color.WHITE, mDarkAmount);
+        return 0xFFAAAAAA;
     }
 
     @VisibleForTesting

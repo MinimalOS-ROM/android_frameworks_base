@@ -319,8 +319,8 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         if (mScrimBehind == null || mNotificationsScrim == null) {
             return;
         }
-        mScrimBehind.setCornerRadius(radius);
-        mNotificationsScrim.setCornerRadius(radius);
+        mScrimBehind.setCornerRadius(0);
+        mNotificationsScrim.setCornerRadius(0);
     }
 
     void setScrimVisibleListener(Consumer<Integer> listener) {
@@ -1214,10 +1214,8 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
 
     private void updateThemeColors() {
         if (mScrimBehind == null) return;
-        int background = Utils.getColorAttr(mScrimBehind.getContext(),
-                android.R.attr.colorBackgroundFloating).getDefaultColor();
-        int surfaceBackground = Utils.getColorAttr(mScrimBehind.getContext(),
-                com.android.internal.R.attr.colorSurfaceHeader).getDefaultColor();
+        int background = Color.BLACK;
+        int surfaceBackground = Color.BLACK;
         int accent = Utils.getColorAccent(mScrimBehind.getContext()).getDefaultColor();
         mColors.setMainColor(background);
         mColors.setSecondaryColor(accent);

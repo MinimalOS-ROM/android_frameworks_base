@@ -60,8 +60,10 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.os.Binder;
 import android.os.Bundle;
@@ -81,8 +83,10 @@ import android.telecom.TelecomManager;
 import android.telephony.TelephonyManager;
 import android.util.ArraySet;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.GestureDetector;
+import android.view.Gravity;
 import android.view.IWindowManager;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -99,6 +103,7 @@ import android.widget.ListPopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
@@ -550,7 +555,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     }
 
     private boolean shouldShowRestartSubmenu() {
-        return PowerMenuUtils.isAdvancedRestartPossible(mContext);
+        return false;
     }
 
     /**
@@ -559,8 +564,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
      */
     @VisibleForTesting
     protected int getMaxShownPowerItems() {
-        return mResources.getInteger(com.android.systemui.R.integer.power_menu_lite_max_columns)
-                * mResources.getInteger(com.android.systemui.R.integer.power_menu_lite_max_rows);
+        return 10;
     }
 
     /**
@@ -577,7 +581,12 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
     @VisibleForTesting
     protected String[] getDefaultActions() {
-        return mResources.getStringArray(R.array.config_globalActionsList);
+        return new String[] {
+                GLOBAL_ACTION_KEY_POWER,
+                GLOBAL_ACTION_KEY_RESTART,
+                GLOBAL_ACTION_KEY_SCREENSHOT,
+                GLOBAL_ACTION_KEY_EMERGENCY
+        };
     }
 
     private void addIfShouldShowAction(List<Action> actions, Action action) {
@@ -622,14 +631,10 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         List<Action> tempActions = new ArrayList<>();
         CurrentUserProvider currentUser = new CurrentUserProvider();
 
-        // make sure emergency affordance action is first, if needed
-        if (mEmergencyAffordanceManager.needsEmergencyAffordance()) {
-            addIfShouldShowAction(tempActions, new EmergencyAffordanceAction());
-            addedKeys.add(GLOBAL_ACTION_KEY_EMERGENCY);
-        }
-
-        for (int i = 0; i < mActions.length; i++) {
-            String actionKey = mActions[i];
+        // Build the fixed 4-item minimal power menu in order: POWER OFF, RESTART, SCREENSHOT, EMERGENCY
+        String[] minimalActions = getDefaultActions();
+        for (int i = 0; i < minimalActions.length; i++) {
+            String actionKey = minimalActions[i];
             if (addedKeys.contains(actionKey)) {
                 // If we already have added this, don't add it again.
                 continue;
@@ -914,7 +919,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
         @Override
         public boolean shouldShow() {
-            return mHasTelephony;
+            return true;
         }
     }
 
@@ -2547,6 +2552,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         private LockPatternUtils mLockPatternUtils;
 
         protected ViewGroup mContainer;
+        private LinearLayout mMinimalPowerList;
 
         @VisibleForTesting
         protected GestureDetector.SimpleOnGestureListener mGestureListener =
@@ -2747,6 +2753,13 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                 mScrimAlpha = 1.0f;
             }
 
+            mContainer.setBackgroundColor(Color.BLACK);
+            mGlobalActionsLayout.setVisibility(View.GONE);
+            if (overflowButton != null) {
+                overflowButton.setVisibility(View.GONE);
+            }
+            setupMinimalPowerList();
+
             // If user entered from the lock screen and smart lock was enabled, disable it
             int user = KeyguardUpdateMonitor.getCurrentUser();
             boolean userHasTrust = mKeyguardUpdateMonitor.getUserHasTrust(user);
@@ -2754,6 +2767,86 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                 mLockPatternUtils.requireCredentialEntry(KeyguardUpdateMonitor.getCurrentUser());
                 showSmartLockDisabledMessage();
             }
+        }
+
+        private void setupMinimalPowerList() {
+            if (mMinimalPowerList != null) {
+                mContainer.removeView(mMinimalPowerList);
+            }
+            float density = mContext.getResources().getDisplayMetrics().density;
+            int padH = Math.round(16 * density);
+            mMinimalPowerList = new LinearLayout(mContext);
+            mMinimalPowerList.setOrientation(LinearLayout.VERTICAL);
+            mMinimalPowerList.setGravity(Gravity.CENTER);
+            mMinimalPowerList.setBackgroundColor(Color.BLACK);
+            mMinimalPowerList.setPadding(padH, 0, padH, 0);
+            mContainer.addView(mMinimalPowerList, new ConstraintLayout.LayoutParams(
+                    MATCH_PARENT, MATCH_PARENT));
+            rebuildMinimalPowerList();
+        }
+
+        private void rebuildMinimalPowerList() {
+            if (mMinimalPowerList == null) {
+                return;
+            }
+            mMinimalPowerList.removeAllViews();
+            float density = mContext.getResources().getDisplayMetrics().density;
+            int btnHeight = Math.round(52 * density);
+            int btnMarginBottom = Math.round(10 * density);
+            int strokePx = Math.max(1, Math.round(density));
+            Typeface monoBold = Typeface.create("monospace", Typeface.BOLD);
+
+            int count = mAdapter.getCount();
+            for (int i = 0; i < count; i++) {
+                final int index = i;
+                Action action = mAdapter.getItem(i);
+                String label;
+                if (action instanceof ShutDownAction) {
+                    label = "POWER OFF";
+                } else if (action instanceof RestartAction) {
+                    label = "RESTART";
+                } else if (action instanceof ScreenshotAction) {
+                    label = "SCREENSHOT";
+                } else if (action instanceof EmergencyAction) {
+                    label = "EMERGENCY";
+                } else if (action.getMessage() != null) {
+                    label = action.getMessage().toString().toUpperCase();
+                } else {
+                    label = mContext.getString(action.getMessageResId()).toUpperCase();
+                }
+
+                TextView btn = new TextView(mContext);
+                btn.setText(label);
+                btn.setGravity(Gravity.CENTER);
+                btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+                btn.setTypeface(monoBold);
+                btn.setFocusable(true);
+                btn.setFocusableInTouchMode(true);
+                btn.setClickable(true);
+                applyMinimalButtonStyle(btn, false, strokePx);
+                btn.setOnFocusChangeListener((v, hasFocus) ->
+                        applyMinimalButtonStyle(btn, hasFocus, strokePx));
+                btn.setOnClickListener(v -> mAdapter.onClickItem(index));
+                if (action instanceof LongPressAction) {
+                    btn.setOnLongClickListener(v -> mAdapter.onLongClickItem(index));
+                }
+
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        MATCH_PARENT, btnHeight);
+                if (i < count - 1) {
+                    lp.bottomMargin = btnMarginBottom;
+                }
+                mMinimalPowerList.addView(btn, lp);
+            }
+        }
+
+        private void applyMinimalButtonStyle(TextView btn, boolean focused, int strokePx) {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(0f);
+            bg.setColor(focused ? Color.WHITE : Color.BLACK);
+            bg.setStroke(strokePx, focused ? Color.WHITE : 0xFF444444);
+            btn.setBackground(bg);
+            btn.setTextColor(focused ? Color.BLACK : Color.WHITE);
         }
 
         protected void fixNavBarClipping() {
@@ -2801,6 +2894,14 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         protected void onStart() {
             super.onStart();
             mGlobalActionsLayout.updateList();
+            rebuildMinimalPowerList();
+            if (mMinimalPowerList != null && mMinimalPowerList.getChildCount() > 0) {
+                mMinimalPowerList.post(() -> {
+                    if (mMinimalPowerList.getChildCount() > 0) {
+                        mMinimalPowerList.getChildAt(0).requestFocus();
+                    }
+                });
+            }
 
             if (mBackgroundDrawable instanceof ScrimDrawable) {
                 mColorExtractor.addOnColorsChangedListener(this);
